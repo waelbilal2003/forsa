@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-
 import 'screens/home_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
@@ -50,7 +49,7 @@ class EditorialPulseApp extends StatelessWidget {
           ),
         ),
       ),
-      initialRoute: '/',
+      initialRoute: '/register',
       routes: {
         '/': (context) => const HomeScreen(),
         '/cart': (context) => const CartScreen(),
