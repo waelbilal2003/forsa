@@ -309,7 +309,7 @@ class RegisterScreen extends StatelessWidget {
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: () {},
-                                  icon: const Icon(Icons.g_mobiledata,
+                                  icon: const Icon(Icons.login,
                                       color: Color(0xFFDB4437)),
                                   label: const Text('جوجل'),
                                   style: OutlinedButton.styleFrom(
