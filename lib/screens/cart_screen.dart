@@ -1,309 +1,176 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_bottom_nav.dart';
+import '../services/api_service.dart';
+import '../services/session.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FC),
-      appBar: AppBar(
-        title: const Text('سلة المشتريات'),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon:
-                const Icon(Icons.notifications_none, color: Color(0xFFFF6D00)),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Directionality(
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  List<dynamic> _items = [];
+  double _total = 0;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCart();
+  }
+
+  Future<void> _loadCart() async {
+    if (Session.userId == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final data = await ApiService.getCart(Session.userId!);
+      setState(() {
+        _items = data['items'] ?? [];
+        _total = double.tryParse(data['total'].toString()) ?? 0;
+      });
+    } catch (_) {
+      _snack('تعذّر تحميل السلة');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _changeQty(int itemId, int newQty) async {
+    try {
+      await ApiService.updateCartItem(itemId, newQty);
+      _loadCart();
+    } catch (_) {
+      _snack('تعذّر تعديل الكمية');
+    }
+  }
+
+  Future<void> _remove(int itemId) async {
+    try {
+      await ApiService.removeCartItem(itemId);
+      _loadCart();
+    } catch (_) {
+      _snack('تعذّر الحذف');
+    }
+  }
+
+  Future<void> _checkout() async {
+    if (Session.userId == null) return;
+    if (_items.isEmpty) {
+      _snack('السلة فارغة');
+      return;
+    }
+
+    // اطلب عنوان التوصيل ورقم التواصل والمسافة قبل تأكيد الطلب
+    final addressCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final distanceCtrl = TextEditingController();
+    const double pricePerKm = 10000; // كل 1 كم = 10000 ل.س
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+        child: StatefulBuilder(
+          builder: (ctx, setLocal) {
+            final dist = double.tryParse(distanceCtrl.text.trim()) ?? 0;
+            final deliveryPrice = dist * pricePerKm;
+            final eta = dist > 0 ? (dist * 3).ceil() + 5 : 0;
+            final productsTotal = _total;
+            return AlertDialog(
+              title: const Text('بيانات التوصيل'),
+              content: SingleChildScrollView(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'لديك 3 عروض مميزة تنتظر التأكيد',
-                      style: TextStyle(
-                          color: const Color(0xFF585C61), fontSize: 14),
-                    ),
-                    const SizedBox(height: 20),
-                    // Cart Items
-                    _buildCartItem(
-                      imageUrl:
-                          'https://lh3.googleusercontent.com/aida-public/AB6AXuDP_1pl4gLMgrbfdKZrRMCiaLX-Rj54FQoE1D1_1OXwiGrPIYLMpGh6USOm5Tgcs0kqs5ZrYDs82DsAsVTcQsQpQ8unYVUdsSwGCr90BMkLJnacBsyf3pbeHZWnkIz3aJhDIdQbQ5a7Shfq598AALTf-8M3Bf5Go5rnkasIoZcg2AAYC52yB4JhSSvdEM5dw1IALWQauwNR5-V04rqvpALesKN2za1Sd_5WDXBR9x8X74JVpBpgWuB0gFzF74ZPS8kXMNaJytF4S7oi',
-                      title: 'حذاء رياضي الترا بوست',
-                      store: 'متجر سبورت لاين',
-                      price: 250,
-                      originalPrice: 400,
-                      discount: 'وفر 35%',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCartItem(
-                      imageUrl:
-                          'https://lh3.googleusercontent.com/aida-public/AB6AXuBk-mLl7Ze0oXYdS-Eh2bseFkCo1G51JyKIUVtgY-CN-WynDRe6WUVhhHcstpCXaJcQezOojUWNxL0QffVyPVugKIB7jYhTEkfUXIpCBk3cILGEKkjMCuzqjdn9HMVHmHe33wuQgbMuNfxKfacXCG42AqwwXa31rRXBm0YExzm1dT0Nc4wcwXK7oMrBSeRW5gyGvH35ZilNujqTDvoRDGGIuVNugD1C4NMFSZYRw4AMHeU5ZaNAW14ncU2p-Y_dug8-voTl5zUXoraO',
-                      title: 'سماعات رأس لاسلكية',
-                      store: 'عالم التكنولوجيا',
-                      price: 850,
-                      originalPrice: 1200,
-                      discount: 'عرض محدود',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCartItem(
-                      imageUrl:
-                          'https://lh3.googleusercontent.com/aida-public/AB6AXuCxZ3Uqlvc1DEvXL9_oAqtdHz3mV7m6b_BfPXBEzyeBP-AtQ415TWkLxyRgRI97KLE5mUAgRsafHMv2ste7nH8oC0YCRFgvafgueSl52jPtsQ_nh2P4QWxePQVyhQ1bIzcstDx-tnZGsfe9ia3hY_Y-JqrnI1fzVPYKl8yX3HTmA1f6rzHeOzSQbHhic7gBqkw0IgDoZFyibSHbm0X6FPDO6G8w2vF9ZGofUqXWv0HjrQs-f0OjfVRurfZkx39XZX-I1INFZYNjtSYy',
-                      title: 'ساعة كلاسيكية حديثة',
-                      store: 'بوتيك الأناقة',
-                      price: 420,
-                      originalPrice: 550,
-                      quantity: 2,
-                    ),
-                    const SizedBox(height: 20),
-                    // Order Summary
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 24),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'ملخص الطلب',
-                            style: GoogleFonts.tajawal(
-                                fontSize: 20, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildSummaryRow('المجموع الفرعي', '1,940 ريال'),
-                          _buildSummaryRow('رسوم التوصيل', '25 ريال'),
-                          _buildSummaryRow('خصم العروض', '- 410 ريال',
-                              isDiscount: true),
-                          const Divider(height: 24),
-                          _buildSummaryRow('الإجمالي', '1,555 ريال',
-                              isTotal: true),
-                          const SizedBox(height: 20),
-                          // Promo Code
-                          const Text('كود الخصم',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  decoration: InputDecoration(
-                                    hintText: 'أدخل الكود هنا',
-                                    filled: true,
-                                    fillColor: const Color(0xFFEDF1F7),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2B2F33),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: const Text('تطبيق'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          // Checkout Button
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () {},
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF6D00),
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text('إتمام عملية الشراء',
-                                      style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold)),
-                                  SizedBox(width: 8),
-                                  Icon(Icons.arrow_back),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'بالضغط على إتمام الشراء، فإنك توافق على شروط وأحكام Editorial Pulse.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 10, color: const Color(0xFF73777C)),
-                          ),
-                        ],
+                    TextField(
+                      controller: addressCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'عنوان التوصيل',
+                        hintText: 'الحي، الشارع، رقم المبنى...',
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'رقم التواصل',
+                        hintText: '05xxxxxxxx',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: distanceCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setLocal(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'المسافة (كم)',
+                        hintText: 'مثال: 4.5',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    _summaryRow('سعر المنتجات',
+                        '${productsTotal.toStringAsFixed(0)} ل.س'),
+                    _summaryRow('سعر التوصيل',
+                        '${deliveryPrice.toStringAsFixed(0)} ل.س'),
+                    _summaryRow('الإجمالي النهائي',
+                        '${(productsTotal + deliveryPrice).toStringAsFixed(0)} ل.س',
+                        bold: true),
+                    if (eta > 0)
+                      _summaryRow('مدة الوصول المتوقعة', '$eta دقيقة'),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: const CustomBottomNav(currentIndex: 2),
-    );
-  }
-
-  Widget _buildCartItem({
-    required String imageUrl,
-    required String title,
-    required String store,
-    required int price,
-    int? originalPrice,
-    String? discount,
-    int quantity = 1,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12),
-        ],
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              imageUrl,
-              width: 80,
-              height: 80,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          size: 20, color: Color(0xFFB02500)),
-                      onPressed: () {},
-                    ),
-                  ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('إلغاء'),
                 ),
-                Text(store,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF4953AC))),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text('$price ريال',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFFF6D00))),
-                            if (originalPrice != null) ...[
-                              const SizedBox(width: 6),
-                              Text('$originalPrice ريال',
-                                  style: const TextStyle(
-                                      decoration: TextDecoration.lineThrough,
-                                      fontSize: 12,
-                                      color: Color(0xFF73777C))),
-                            ],
-                          ],
-                        ),
-                        if (discount != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFF6D00).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(discount,
-                                style: const TextStyle(
-                                    fontSize: 10, color: Color(0xFFFF6D00))),
-                          ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove, size: 18),
-                          onPressed: () {},
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                        ),
-                        Container(
-                          width: 32,
-                          alignment: Alignment.center,
-                          child: Text('$quantity',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add, size: 18),
-                          onPressed: () {},
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  ],
+                ElevatedButton(
+                  onPressed: () {
+                    if (addressCtrl.text.trim().isEmpty ||
+                        phoneCtrl.text.trim().isEmpty) {
+                      return;
+                    }
+                    Navigator.pop(ctx, true);
+                  },
+                  child: const Text('تأكيد الطلب'),
                 ),
               ],
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
+
+    if (confirmed != true) return;
+
+    final distanceKm = double.tryParse(distanceCtrl.text.trim()) ?? 0;
+    try {
+      await ApiService.checkout(
+        Session.userId!,
+        deliveryAddress: addressCtrl.text.trim(),
+        contactPhone: phoneCtrl.text.trim(),
+        distanceKm: distanceKm,
+      );
+      if (!mounted) return;
+      _snack('تم تأكيد طلبك بنجاح');
+      _loadCart();
+      Navigator.pushNamed(context, '/orders');
+    } catch (e) {
+      _snack(e is ApiException ? e.message : 'تعذّر إتمام الطلب');
+    }
   }
 
-  Widget _buildSummaryRow(String label, String value,
-      {bool isDiscount = false, bool isTotal = false}) {
+  Widget _summaryRow(String label, String value, {bool bold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -311,21 +178,166 @@ class CartScreen extends StatelessWidget {
         children: [
           Text(label,
               style: TextStyle(
-                  color: isDiscount
-                      ? const Color(0xFF4CAF50)
-                      : const Color(0xFF73777C))),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              fontSize: isTotal ? 20 : 14,
-              color: isDiscount
-                  ? const Color(0xFF4CAF50)
-                  : (isTotal ? const Color(0xFFFF6D00) : null),
+                  fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+                  color: bold ? const Color(0xFF9B3F00) : null)),
+        ],
+      ),
+    );
+  }
+
+  void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(m), behavior: SnackBarBehavior.floating));
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F6FC),
+        appBar: AppBar(
+          title: const Text('سلة المشتريات'),
+          centerTitle: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none,
+                  color: Color(0xFFFF6D00)),
+              onPressed: () {},
+            ),
+          ],
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  Expanded(
+                    child: _items.isEmpty
+                        ? const Center(child: Text('سلتك فارغة'))
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _items.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, i) =>
+                                _buildCartItem(_items[i]),
+                          ),
+                  ),
+                  if (_items.isNotEmpty) _buildSummaryBar(),
+                ],
+              ),
+        bottomNavigationBar: const CustomBottomNav(currentIndex: 2),
+      ),
+    );
+  }
+
+  Widget _buildCartItem(dynamic item) {
+    final id = int.tryParse(item['id'].toString()) ?? 0;
+    final qty = int.tryParse(item['quantity'].toString()) ?? 1;
+    final price = double.tryParse(item['price'].toString()) ?? 0;
+    final image = item['image_url']?.toString();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: (image != null && image.startsWith('http'))
+                ? Image.network(image,
+                    width: 70,
+                    height: 70,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _imgPlaceholder())
+                : _imgPlaceholder(),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item['name']?.toString() ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text('${price.toStringAsFixed(0)} ل.س',
+                    style: const TextStyle(
+                        color: Color(0xFF9B3F00), fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => _changeQty(id, qty - 1),
+                icon: const Icon(Icons.remove_circle_outline),
+              ),
+              Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold)),
+              IconButton(
+                onPressed: () => _changeQty(id, qty + 1),
+                icon: const Icon(Icons.add_circle_outline),
+              ),
+              IconButton(
+                onPressed: () => _remove(id),
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryBar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('الإجمالي',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text('${_total.toStringAsFixed(0)} ل.س',
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF9B3F00))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _checkout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF7A2C),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+              ),
+              child: const Text('إتمام الطلب',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _imgPlaceholder() => Container(
+        width: 70,
+        height: 70,
+        color: const Color(0xFFEDF1F7),
+        child: const Icon(Icons.shopping_bag, color: Color(0xFF9B3F00)),
+      );
 }

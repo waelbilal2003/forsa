@@ -1,5 +1,5 @@
-name: editorial_pulse
-description: تطبيق تسوق مع تصميم Editorial Pulse
+name: forsa
+description: "تطبيق فرصة - سوق عروض متعدد الأدوار (زبون/تاجر/سائق)"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,13 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  google_fonts: ^6.2.1           # للخطوط العربية والأجنبية
-  flutter_svg: ^2.0.9            # للـ SVGs إذا وجدت
   cupertino_icons: ^1.0.6
-  provider: ^6.1.1               # لإدارة الحالة
-  intl: ^0.18.1                  # للتنسيقات الرقمية والعملات
-
-  flutter_launcher_icons: "^0.13.1" 
+  http: ^1.2.0
+  google_fonts: ^6.2.1
+  shared_preferences: ^2.2.3
 
 dev_dependencies:
   flutter_test:
@@ -24,12 +21,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
-# 👇 قسم أيقونة التطبيق
-flutter_launcher_icons:
-  android: true
-  ios: false  # لأنك تريد للأندرويد فقط
-  image_path: "assets/logo.png"  # ضع مسار اللوجو هنا
-  adaptive_icon_background: "#ffffff"  # لون خلفية الأيقونة التكيفية (اختياري)
-  adaptive_icon_foreground: "assets/logo.png"  # الأيقونة الأمامية للأندرويد 8+
-  

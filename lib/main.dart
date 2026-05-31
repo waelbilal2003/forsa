@@ -1,65 +1,88 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+// lib/main.dart
+//
+// نقطة انطلاق التطبيق. المسارات مقسّمة بوضوح حسب الدور:
+//  - الزبون:  /  /orders  /cart  /profile  /offer-details  /track-order  /filter
+//  - التاجر:  /merchant-orders  /add-offer  /offer-stats  /publish_success
+//  - السائق:  /driver-home  /driver-wallet  /driver-account  /order-receipt ...
+//
+// كل دور يبدأ من شاشته الجذرية بـ pushReplacement، وزر "تسجيل الخروج" يعيد
+// المستخدم لشاشة /login. هكذا لا تختلط واجهات الأدوار الثلاثة.
 
-import 'screens/home_screen.dart';
-import 'screens/cart_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/offer_details_screen.dart';
-import 'screens/orders_screen.dart';
-import 'screens/track_order_screen.dart';
-import 'screens/filter_screen.dart';
+import 'package:flutter/material.dart';
+import 'theme/app_theme.dart';
+import 'services/api_service.dart';
+
+// شاشات عامة
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 
-void main() {
-  runApp(const EditorialPulseApp());
+// شاشات الزبون
+import 'screens/home_screen.dart';
+import 'screens/orders_screen.dart';
+import 'screens/cart_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/track_order_screen.dart';
+import 'screens/offer_details_screen.dart';
+import 'screens/filter_screen.dart';
+
+// شاشات التاجر
+import 'screens/publish_success.dart';
+import 'screens/orders_management.dart';
+import 'screens/offer_stats.dart';
+import 'screens/add_offer.dart';
+import 'screens/offers_history_screen.dart';
+
+// شاشات السائق
+import 'screens/order_receipt_screen.dart';
+import 'screens/order_tracking_screen.dart';
+import 'screens/complete_delivery_screen.dart';
+import 'screens/chat_screen.dart';
+import 'screens/driver_main_screen.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiService.loadBaseUrl();
+  runApp(const ForsaApp());
 }
 
-class EditorialPulseApp extends StatelessWidget {
-  const EditorialPulseApp({super.key});
+class ForsaApp extends StatelessWidget {
+  const ForsaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Editorial Pulse',
+      title: 'فرصة',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar', 'SA'),
-      theme: ThemeData(
-        fontFamily: 'Tajawal',
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF4F6FC),
-        primaryColor: const Color(0xFF9B3F00),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF9B3F00),
-          secondary: Color(0xFF6D5A00),
-          tertiary: Color(0xFF4953AC),
-          error: Color(0xFFB02500),
-          surface: Color(0xFFF4F6FC),
-          onSurface: Color(0xFF2B2F33),
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.white.withOpacity(0.9),
-          elevation: 0,
-          centerTitle: true,
-          iconTheme: const IconThemeData(color: Color(0xFF9B3F00)),
-          titleTextStyle: GoogleFonts.tajawal(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF2B2F33),
-          ),
-        ),
-      ),
-      initialRoute: '/register',
+      theme: AppTheme.light(),
+      initialRoute: '/login',
       routes: {
-        '/': (context) => const HomeScreen(),
-        '/cart': (context) => const CartScreen(),
-        '/profile': (context) => const ProfileScreen(),
-        '/offer-details': (context) => const OfferDetailsScreen(),
-        '/orders': (context) => const OrdersScreen(),
-        '/track-order': (context) => const TrackOrderScreen(),
-        '/filter': (context) => const FilterScreen(),
+        // عام
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
+
+        // الزبون
+        '/': (context) => const HomeScreen(),
+        '/orders': (context) => const OrdersScreen(),
+        '/cart': (context) => const CartScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/track-order': (context) => const TrackOrderScreen(),
+        '/offer-details': (context) => const OfferDetailsScreen(),
+        '/filter': (context) => const FilterScreen(),
+
+        // التاجر
+        '/merchant-orders': (context) => const OrdersManagementScreen(),
+        '/add-offer': (context) => const AddOfferScreen(),
+        '/offers-history': (context) => const OffersHistoryScreen(),
+        '/offer-stats': (context) => const OfferStatsScreen(),
+        '/publish_success': (context) => const PublishSuccessScreen(),
+
+        // السائق
+        '/driver-home': (context) => const DriverMainScreen(),
+        '/order-receipt': (context) => const OrderReceiptScreen(),
+        '/order-tracking': (context) => const OrderTrackingScreen(),
+        '/complete-delivery': (context) => const CompleteDeliveryScreen(),
+        '/chat': (context) => const ChatScreen(),
       },
     );
   }

@@ -1,85 +1,39 @@
+// lib/widgets/custom_bottom_nav.dart
+//
+// شريط التنقل السفلي الخاص بواجهة الزبون فقط (الرئيسية/الطلبات/السلة/حسابي).
+// يستخدم pushReplacementNamed للتنقل بين التبويبات حتى لا تتراكم الشاشات
+// ولا يختلط مع واجهات التاجر أو السائق.
+
 import 'package:flutter/material.dart';
 
 class CustomBottomNav extends StatelessWidget {
   final int currentIndex;
   const CustomBottomNav({super.key, required this.currentIndex});
 
-  void _onItemTapped(BuildContext context, int index) {
-    if (index == currentIndex)
-      return; // لا تفعل شيء إذا كان المستخدم في نفس الصفحة
+  static const _routes = ['/', '/orders', '/cart', '/profile'];
 
-    // العودة أولاً للشاشة الرئيسية لتصفية المكدس وضمان ظهور زر الرجوع تلقائياً بداخل الشاشات الأخرى
-    Navigator.of(context).popUntil((route) => route.isFirst);
-
-    switch (index) {
-      case 0:
-        // زر الرئيسية: يعود للشاشة الرئيسية بنجاح كوننا قمنا بـ popUntil للشاشة الأولى
-        break;
-      case 1:
-        Navigator.pushNamed(context, '/orders');
-        break;
-      case 2:
-        Navigator.pushNamed(context, '/cart');
-        break;
-      case 3:
-        // العروض: يمكنك إضافة مسارها هنا عند إنشائها في الـ main.dart
-        break;
-      case 4:
-        Navigator.pushNamed(context, '/profile');
-        break;
-    }
+  void _onTap(BuildContext context, int index) {
+    if (index == currentIndex) return;
+    // تبويبات شقيقة: نستبدل الشاشة الحالية بدل تكديسها.
+    Navigator.pushReplacementNamed(context, _routes[index]);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -8))
-        ],
-      ),
-      child: SafeArea(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(
-                Icons.home_outlined, Icons.home, 'الرئيسية', 0, context),
-            _buildNavItem(Icons.receipt_long_outlined, Icons.receipt_long,
-                'طلباتي', 1, context),
-            _buildNavItem(Icons.shopping_cart_outlined, Icons.shopping_cart,
-                'السلة', 2, context),
-            _buildNavItem(Icons.local_offer_outlined, Icons.local_offer,
-                'العروض', 3, context),
-            _buildNavItem(
-                Icons.person_outline, Icons.person, 'الحساب', 4, context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData iconOutlined, IconData iconFilled, String label,
-      int index, BuildContext context) {
-    final isSelected = currentIndex == index;
-    return GestureDetector(
-      onTap: () => _onItemTapped(context, index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(isSelected ? iconFilled : iconOutlined,
-              color: isSelected ? const Color(0xFF9B3F00) : Colors.grey),
-          const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: isSelected ? const Color(0xFF9B3F00) : Colors.grey)),
-        ],
-      ),
+    return BottomNavigationBar(
+      currentIndex: currentIndex.clamp(0, 3),
+      onTap: (i) => _onTap(context, i),
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: const Color(0xFFFF7A2C),
+      unselectedItemColor: Colors.grey,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long), label: 'طلباتي'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_cart), label: 'السلة'),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي'),
+      ],
     );
   }
 }
