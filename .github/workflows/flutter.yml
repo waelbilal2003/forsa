@@ -24,7 +24,7 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.1' # يمكنك تحديث هذا الإصدار إذا لزم الأمر
+          flutter-version: '3.44.4' # يمكنك تحديث هذا الإصدار إذا لزم الأمر
 
       - name: Flutter Clean
         run: flutter clean
