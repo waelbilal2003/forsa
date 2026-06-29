@@ -1,6 +1,7 @@
 import java.util.Properties
 import java.io.FileInputStream
 import java.util.Base64
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -28,7 +29,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = JvmTarget.JVM_11
     }
 
     defaultConfig {
