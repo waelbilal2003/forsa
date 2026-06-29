@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_bottom_nav.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import 'payment_screen.dart';
+import 'order_summary_screen.dart'; // ✅ شاشة ملخص الطلب الجديدة
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -15,10 +17,24 @@ class _CartScreenState extends State<CartScreen> {
   double _total = 0;
   bool _loading = true;
 
+  // متغيرات كود الخصم
+  final TextEditingController _couponController = TextEditingController();
+  double _couponDiscount = 0;
+  String _appliedCouponCode = '';
+
+  // تخزين الكميات المتاحة في المخزون
+  Map<int, int> _stockAvailability = {};
+
   @override
   void initState() {
     super.initState();
     _loadCart();
+  }
+
+  @override
+  void dispose() {
+    _couponController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCart() async {
@@ -32,7 +48,11 @@ class _CartScreenState extends State<CartScreen> {
       setState(() {
         _items = data['items'] ?? [];
         _total = double.tryParse(data['total'].toString()) ?? 0;
+        _couponDiscount = 0;
+        _appliedCouponCode = '';
+        _couponController.clear();
       });
+      await _loadStockAvailability();
     } catch (_) {
       _snack('تعذّر تحميل السلة');
     } finally {
@@ -40,7 +60,56 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  Future<void> _loadStockAvailability() async {
+    _stockAvailability.clear();
+    for (var item in _items) {
+      final productId = int.tryParse(item['product_id'].toString()) ?? 0;
+      if (productId > 0) {
+        try {
+          final availability = await ApiService.checkProductAvailability(productId);
+          final available = int.tryParse(availability['available_quantity'].toString()) ?? 0;
+          _stockAvailability[productId] = available;
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<bool> _checkAvailability(int productId, int requestedQty) async {
+    try {
+      final availability = await ApiService.checkProductAvailability(productId);
+      final available = int.tryParse(availability['available_quantity'].toString()) ?? 0;
+      if (requestedQty > available) {
+        _snack('الكمية المطلوبة ($requestedQty) غير متوفرة، المتاح: $available');
+        return false;
+      }
+      return true;
+    } catch (_) {
+      _snack('تعذّر التحقق من توفر المنتج');
+      return false;
+    }
+  }
+
   Future<void> _changeQty(int itemId, int newQty) async {
+    if (newQty < 1) {
+      _snack('الكمية يجب أن تكون 1 على الأقل');
+      return;
+    }
+
+    final item = _items.firstWhere(
+      (i) => int.tryParse(i['id'].toString()) == itemId,
+      orElse: () => {},
+    );
+    if (item.isEmpty) return;
+
+    final productId = int.tryParse(item['product_id'].toString()) ?? 0;
+    if (productId == 0) {
+      _snack('خطأ في بيانات المنتج');
+      return;
+    }
+
+    final isAvailable = await _checkAvailability(productId, newQty);
+    if (!isAvailable) return;
+
     try {
       await ApiService.updateCartItem(itemId, newQty);
       _loadCart();
@@ -58,6 +127,60 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  Future<void> _applyCoupon() async {
+    final code = _couponController.text.trim();
+    if (code.isEmpty) {
+      _snack('الرجاء إدخال كود الخصم');
+      return;
+    }
+
+    if (_appliedCouponCode == code) {
+      _snack('هذا الكود مطبق بالفعل');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final result = await ApiService.applyCoupon(code, _total);
+      final newTotal = double.tryParse(result['new_total']?.toString() ?? '') ?? _total;
+      final discount = double.tryParse(result['discount']?.toString() ?? '') ?? 0;
+
+      setState(() {
+        _total = newTotal;
+        _couponDiscount = discount;
+        _appliedCouponCode = code;
+      });
+      _snack('تم تطبيق الخصم بنجاح (${discount.toStringAsFixed(0)} ل.س)');
+    } catch (e) {
+      _snack(e is ApiException ? e.message : 'كود الخصم غير صالح');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _removeCoupon() {
+    setState(() {
+      _couponDiscount = 0;
+      _appliedCouponCode = '';
+      _couponController.clear();
+    });
+    _loadCart();
+    _snack('تم إلغاء كود الخصم');
+  }
+
+  Future<bool> _validateAllItemsAvailability() async {
+    for (var item in _items) {
+      final productId = int.tryParse(item['product_id'].toString()) ?? 0;
+      final qty = int.tryParse(item['quantity'].toString()) ?? 0;
+      if (productId > 0 && qty > 0) {
+        final isAvailable = await _checkAvailability(productId, qty);
+        if (!isAvailable) return false;
+      }
+    }
+    return true;
+  }
+
+  // ✅ دالة إتمام الطلب (بدون نافذة بيانات التوصيل)
   Future<void> _checkout() async {
     if (Session.userId == null) return;
     if (_items.isEmpty) {
@@ -65,127 +188,63 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
-    // اطلب عنوان التوصيل ورقم التواصل والمسافة قبل تأكيد الطلب
-    final addressCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final distanceCtrl = TextEditingController();
-    const double pricePerKm = 10000; // كل 1 كم = 10000 ل.س
+    setState(() => _loading = true);
+    final allAvailable = await _validateAllItemsAvailability();
+    setState(() => _loading = false);
+    if (!allAvailable) {
+      _snack('بعض المنتجات غير متوفرة بالكمية المطلوبة، يرجى تحديث السلة');
+      return;
+    }
+
+    // ✅ جلب بيانات الزبون من الجلسة
+    final customerName = Session.name ?? 'زبون';
+    final customerEmail = Session.email ?? '';
+    final customerPhone = Session.phone ?? '';
+
+    // ✅ عرض ملخص الطلب
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: StatefulBuilder(
-          builder: (ctx, setLocal) {
-            final dist = double.tryParse(distanceCtrl.text.trim()) ?? 0;
-            final deliveryPrice = dist * pricePerKm;
-            final eta = dist > 0 ? (dist * 3).ceil() + 5 : 0;
-            final productsTotal = _total;
-            return AlertDialog(
-              title: const Text('بيانات التوصيل'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: addressCtrl,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'عنوان التوصيل',
-                        hintText: 'الحي، الشارع، رقم المبنى...',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: phoneCtrl,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'رقم التواصل',
-                        hintText: '05xxxxxxxx',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: distanceCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (_) => setLocal(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'المسافة (كم)',
-                        hintText: 'مثال: 4.5',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    _summaryRow('سعر المنتجات',
-                        '${productsTotal.toStringAsFixed(0)} ل.س'),
-                    _summaryRow('سعر التوصيل',
-                        '${deliveryPrice.toStringAsFixed(0)} ل.س'),
-                    _summaryRow('الإجمالي النهائي',
-                        '${(productsTotal + deliveryPrice).toStringAsFixed(0)} ل.س',
-                        bold: true),
-                    if (eta > 0)
-                      _summaryRow('مدة الوصول المتوقعة', '$eta دقيقة'),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('إلغاء'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (addressCtrl.text.trim().isEmpty ||
-                        phoneCtrl.text.trim().isEmpty) {
-                      return;
-                    }
-                    Navigator.pop(ctx, true);
-                  },
-                  child: const Text('تأكيد الطلب'),
-                ),
-              ],
-            );
-          },
-        ),
+      builder: (ctx) => OrderSummaryScreen(
+        items: _items,
+        total: _total,
+        couponDiscount: _couponDiscount,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        customerPhone: customerPhone,
+        onConfirm: () => Navigator.pop(ctx, true),
+        onCancel: () => Navigator.pop(ctx, false),
       ),
     );
 
     if (confirmed != true) return;
 
-    final distanceKm = double.tryParse(distanceCtrl.text.trim()) ?? 0;
+    setState(() => _loading = true);
     try {
-      await ApiService.checkout(
+      final result = await ApiService.checkout(
         Session.userId!,
-        deliveryAddress: addressCtrl.text.trim(),
-        contactPhone: phoneCtrl.text.trim(),
-        distanceKm: distanceKm,
+        deliveryAddress: Session.address ?? '',
+        contactPhone: Session.phone ?? '',
+        distanceKm: 5.0, // ✅ يمكن حسابها من الموقع الحقيقي
       );
       if (!mounted) return;
-      _snack('تم تأكيد طلبك بنجاح');
-      _loadCart();
-      Navigator.pushNamed(context, '/orders');
+      final orderId = result['order_id'] ?? 0;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentScreen(
+            total: _total,
+            orderId: orderId is int ? orderId : 0,
+          ),
+        ),
+      ).then((_) => _loadCart());
+
+      _snack('تم إنشاء طلبك بنجاح');
     } catch (e) {
       _snack(e is ApiException ? e.message : 'تعذّر إتمام الطلب');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-  }
-
-  Widget _summaryRow(String label, String value, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
-          Text(value,
-              style: TextStyle(
-                  fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-                  color: bold ? const Color(0xFF9B3F00) : null)),
-        ],
-      ),
-    );
   }
 
   void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(
@@ -202,8 +261,7 @@ class _CartScreenState extends State<CartScreen> {
           centerTitle: false,
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications_none,
-                  color: Color(0xFFFF6D00)),
+              icon: const Icon(Icons.notifications_none, color: Color(0xFFFF6D00)),
               onPressed: () {},
             ),
           ],
@@ -218,10 +276,8 @@ class _CartScreenState extends State<CartScreen> {
                         : ListView.separated(
                             padding: const EdgeInsets.all(16),
                             itemCount: _items.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (context, i) =>
-                                _buildCartItem(_items[i]),
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (context, i) => _buildCartItem(_items[i]),
                           ),
                   ),
                   if (_items.isNotEmpty) _buildSummaryBar(),
@@ -237,6 +293,8 @@ class _CartScreenState extends State<CartScreen> {
     final qty = int.tryParse(item['quantity'].toString()) ?? 1;
     final price = double.tryParse(item['price'].toString()) ?? 0;
     final image = item['image_url']?.toString();
+    final productId = int.tryParse(item['product_id'].toString()) ?? 0;
+    final availableStock = _stockAvailability[productId] ?? -1;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -250,9 +308,7 @@ class _CartScreenState extends State<CartScreen> {
             borderRadius: BorderRadius.circular(12),
             child: (image != null && image.startsWith('http'))
                 ? Image.network(image,
-                    width: 70,
-                    height: 70,
-                    fit: BoxFit.cover,
+                    width: 70, height: 70, fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _imgPlaceholder())
                 : _imgPlaceholder(),
           ),
@@ -267,6 +323,9 @@ class _CartScreenState extends State<CartScreen> {
                 Text('${price.toStringAsFixed(0)} ل.س',
                     style: const TextStyle(
                         color: Color(0xFF9B3F00), fontWeight: FontWeight.bold)),
+                if (availableStock >= 0)
+                  Text('متاح: $availableStock',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
@@ -293,6 +352,8 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildSummaryBar() {
+    final displayTotal = _total - _couponDiscount;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -302,11 +363,60 @@ class _CartScreenState extends State<CartScreen> {
       child: Column(
         children: [
           Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _couponController,
+                  enabled: _appliedCouponCode.isEmpty,
+                  decoration: InputDecoration(
+                    hintText: _appliedCouponCode.isNotEmpty
+                        ? 'مطبّق: $_appliedCouponCode'
+                        : 'كود الخصم',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (_appliedCouponCode.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  onPressed: _removeCoupon,
+                  tooltip: 'إلغاء الكود',
+                ),
+              if (_appliedCouponCode.isEmpty)
+                ElevatedButton(
+                  onPressed: _applyCoupon,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF7A2C),
+                    foregroundColor: Colors.black,
+                  ),
+                  child: const Text('تطبيق'),
+                ),
+            ],
+          ),
+          if (_couponDiscount > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('الخصم', style: TextStyle(color: Colors.green)),
+                Text('-${_couponDiscount.toStringAsFixed(0)} ل.س',
+                    style: const TextStyle(
+                        color: Colors.green, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('الإجمالي',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              Text('${_total.toStringAsFixed(0)} ل.س',
+              Text('${displayTotal.toStringAsFixed(0)} ل.س',
                   style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

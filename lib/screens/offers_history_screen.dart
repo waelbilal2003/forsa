@@ -136,7 +136,7 @@ class _OffersHistoryScreenState extends State<OffersHistoryScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        // العروض المنتهية مظللة بلون فاتح لتمييزها
+    
         color: expired ? const Color(0xFFF1F1F4) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: expired ? Border.all(color: const Color(0xFFE0E0E6)) : null,
@@ -153,7 +153,7 @@ class _OffersHistoryScreenState extends State<OffersHistoryScreen> {
                         color: expired ? Colors.grey.shade600 : null)),
               ),
               Chip(
-                label: Text(expired ? 'منتهٍ' : 'نشط'),
+                label: Text(expired ? 'منتهي' : 'نشط'),
                 backgroundColor: expired
                     ? const Color(0xFFE0E0E6)
                     : AppColors.primaryContainer,

@@ -1,4 +1,4 @@
-// lib/screens/merchant_register_screen.dart
+
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';

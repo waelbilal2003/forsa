@@ -1,6 +1,4 @@
-// lib/theme/app_theme.dart
-//
-// ثيم موحّد بألوان "فرصة" (برتقالي + أصفر) مع دعم العربية.
+
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';

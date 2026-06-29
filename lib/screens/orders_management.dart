@@ -3,6 +3,8 @@ import '../theme/colors.dart';
 import '../theme/typography.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import 'merchant_track_order_screen.dart';
+import 'inventory_screen.dart';
 
 class OrdersManagementScreen extends StatefulWidget {
   const OrdersManagementScreen({super.key});
@@ -18,7 +20,7 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
   static const _statusAr = {
     'pending': 'جديد',
     'confirmed': 'مؤكّد',
-    'shipped': 'تم الشحن',
+    'shipped': 'في الطريق',
     'delivered': 'تم التسليم',
   };
 
@@ -54,8 +56,47 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
     }
   }
 
+  Future<void> _cancelOrder(int orderId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تأكيد إلغاء الطلب'),
+          content: const Text(
+            'هل أنت متأكد من إلغاء هذا الطلب؟ سيتم إعادة الكميات إلى المخزون.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('لا'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('نعم، إلغاء'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await ApiService.cancelOrder(orderId, Session.storeId!);
+      _snack('تم إلغاء الطلب وإعادة الكميات للمخزون');
+      _load();
+    } catch (e) {
+      _snack('فشل الإلغاء: ${e.toString()}');
+    }
+  }
+
   void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(m), behavior: SnackBarBehavior.floating));
+        SnackBar(content: Text(m), behavior: SnackBarBehavior.floating),
+      );
 
   void _logout() {
     Session.clear();
@@ -72,6 +113,11 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
           title: const Text('إدارة الطلبات'),
           centerTitle: false,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.inventory_2),
+              onPressed: () => Navigator.pushNamed(context, '/inventory'),
+              tooltip: 'المخزون',
+            ),
             IconButton(
               tooltip: 'سجل العروض',
               icon: const Icon(Icons.history),
@@ -136,31 +182,70 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('الزبون: ${order['customer_name'] ?? 'غير معروف'}',
-              style: AppTypography.bodySmall),
-          Text('الإجمالي: ${order['total_price'] ?? 0} ل.س',
-              style: AppTypography.bodyMedium),
+          Text(
+            'الزبون: ${order['customer_name'] ?? 'غير معروف'}',
+            style: AppTypography.bodySmall,
+          ),
+          Text(
+            'الإجمالي: ${order['total_price'] ?? 0} ل.س',
+            style: AppTypography.bodyMedium,
+          ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               if (status == 'pending')
-                Expanded(
+                SizedBox(
+                  width: 100,
                   child: OutlinedButton(
                     onPressed: () => _setStatus(id, 'confirmed'),
-                    child: const Text('تأكيد الطلب'),
+                    child: const Text('تأكيد'),
                   ),
                 ),
-              if (status == 'confirmed') ...[
-                Expanded(
+              if (status == 'confirmed')
+                SizedBox(
+                  width: 100,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryFixed,
-                        foregroundColor: AppColors.onPrimaryFixed),
+                      backgroundColor: AppColors.primaryFixed,
+                      foregroundColor: AppColors.onPrimaryFixed,
+                    ),
                     onPressed: () => _setStatus(id, 'shipped'),
-                    child: const Text('جاهز للشحن'),
+                    child: const Text('شحن'),
                   ),
                 ),
-              ],
+              if (status == 'shipped')
+                SizedBox(
+                  width: 100,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MerchantTrackOrderScreen(orderId: id),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.location_on, size: 16),
+                    label: const Text('تتبع'),
+                  ),
+                ),
+              if (status == 'pending' || status == 'confirmed')
+                SizedBox(
+                  width: 100,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _cancelOrder(id),
+                    icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                    label: Text(
+                      'إلغاء',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                    ),
+                  ),
+                ),
             ],
           ),
         ],

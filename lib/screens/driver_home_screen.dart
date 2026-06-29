@@ -3,6 +3,7 @@ import '../theme/colors.dart';
 import '../theme/typography.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import 'driver_delivery_screen.dart'; // استيراد الشاشة الجديدة
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -155,10 +156,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryFixed,
                     foregroundColor: AppColors.onPrimaryFixed),
-                onPressed: () => Navigator.pushNamed(context, '/order-receipt',
-                    arguments: id),
-                icon: const Icon(Icons.receipt_long),
-                label: const Text('عرض الفاتورة والتوصيل'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DriverDeliveryScreen(orderId: id),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.delivery_dining),
+                label: const Text('بدء التوصيل'),
               ),
             )
           else

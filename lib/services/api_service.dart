@@ -1,25 +1,25 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // ▸▸ العنوان الافتراضي — يمكن تغييره من شاشة الإعدادات وحفظه:
-  static const String _defaultBaseUrl = 'http://192.168.43.98:8000/api';
+  static const String _defaultBaseUrl = 'http://192.168.10.234:8000/api';
   static const String _prefsKey = 'api_base_url';
+  static const String _tokenKey = 'api_token';
 
-  // العنوان الحالي (متغيّر يُحمَّل من التخزين عند الإقلاع).
   static String baseUrl = _defaultBaseUrl;
+  static String? _token;
 
-  /// يُستدعى مرة واحدة عند بدء التطبيق لتحميل العنوان المحفوظ.
   static Future<void> loadBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_prefsKey);
     if (saved != null && saved.trim().isNotEmpty) {
       baseUrl = saved.trim();
     }
+    _token = prefs.getString(_tokenKey);
   }
 
-  /// حفظ عنوان API جديد وتطبيقه فوراً.
   static Future<void> setBaseUrl(String url) async {
     final clean = url.trim();
     baseUrl = clean.isEmpty ? _defaultBaseUrl : clean;
@@ -27,18 +27,34 @@ class ApiService {
     await prefs.setString(_prefsKey, baseUrl);
   }
 
-  static Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+  static Future<void> setToken(String token) async {
+    _token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
+  }
 
-  // أداة داخلية لمعالجة الاستجابة وتحويلها إلى Map/List
+  static Future<void> clearToken() async {
+    _token = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+  }
+
+  static Map<String, String> get _headers {
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (_token != null && _token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $_token';
+    }
+    return headers;
+  }
+
   static dynamic _decode(http.Response res) {
     final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return body;
     }
-    // نُعيد رسالة الخطأ القادمة من Laravel إن وُجدت
     final msg = (body is Map && body['message'] != null)
         ? body['message']
         : 'حدث خطأ (${res.statusCode})';
@@ -46,8 +62,6 @@ class ApiService {
   }
 
   // ============ المصادقة ============
-
-  /// تسجيل الدخول لأي دور. يُرجع Map فيه: success, role, user
   static Future<Map<String, dynamic>> login({
     required String role,
     required String email,
@@ -58,7 +72,11 @@ class ApiService {
       headers: _headers,
       body: jsonEncode({'role': role, 'email': email, 'password': password}),
     );
-    return Map<String, dynamic>.from(_decode(res));
+    final data = _decode(res);
+    if (data is Map && data['token'] != null) {
+      await setToken(data['token'].toString());
+    }
+    return Map<String, dynamic>.from(data);
   }
 
   static Future<Map<String, dynamic>> registerCustomer(
@@ -83,7 +101,6 @@ class ApiService {
   }
 
   // ============ العروض ============
-
   static Future<List<dynamic>> getOffers({String? query}) async {
     final uri = Uri.parse('$baseUrl/offers')
         .replace(queryParameters: query != null ? {'q': query} : null);
@@ -116,14 +133,12 @@ class ApiService {
     _decode(res);
   }
 
-  /// زيادة كمية منتج العرض.  PUT /offers/{id}/add-stock
   static Future<Map<String, dynamic>> addOfferStock(int id, int amount) async {
     final res = await http.put(Uri.parse('$baseUrl/offers/$id/add-stock'),
         headers: _headers, body: jsonEncode({'amount': amount}));
     return Map<String, dynamic>.from(_decode(res));
   }
 
-  /// إعادة تفعيل عرض منتهٍ.  PUT /offers/{id}/reactivate
   static Future<Map<String, dynamic>> reactivateOffer(int id,
       {int? stock}) async {
     final res = await http.put(Uri.parse('$baseUrl/offers/$id/reactivate'),
@@ -139,7 +154,6 @@ class ApiService {
   }
 
   // ============ السلة ============
-
   static Future<Map<String, dynamic>> getCart(int userId) async {
     final res =
         await http.get(Uri.parse('$baseUrl/cart/$userId'), headers: _headers);
@@ -171,7 +185,6 @@ class ApiService {
   }
 
   // ============ الطلبات ============
-
   static Future<Map<String, dynamic>> checkout(int userId,
       {required String deliveryAddress,
       required String contactPhone,
@@ -187,14 +200,12 @@ class ApiService {
     return Map<String, dynamic>.from(_decode(res));
   }
 
-  /// الفاتورة التفصيلية.  GET /orders/{id}/invoice
   static Future<Map<String, dynamic>> getInvoice(int orderId) async {
     final res = await http.get(Uri.parse('$baseUrl/orders/$orderId/invoice'),
         headers: _headers);
     return Map<String, dynamic>.from(_decode(res));
   }
 
-  /// السائق يرسل بلاغاً كاذباً.  PUT /orders/{id}/false-report
   static Future<Map<String, dynamic>> sendFalseReport(
       int orderId, int driverId, String reason) async {
     final res = await http.put(
@@ -204,7 +215,6 @@ class ApiService {
     return Map<String, dynamic>.from(_decode(res));
   }
 
-  /// تقييم السائق.  POST /reviews/driver
   static Future<void> rateDriver(
       {required int userId,
       required int driverId,
@@ -223,7 +233,6 @@ class ApiService {
     _decode(res);
   }
 
-  /// تقييم الطلب.  POST /reviews/order
   static Future<void> rateOrder(
       {required int userId,
       required int orderId,
@@ -246,7 +255,6 @@ class ApiService {
     return List<dynamic>.from(_decode(res));
   }
 
-  /// تفاصيل طلب واحد (للتتبّع).  GET /orders/{id}
   static Future<Map<String, dynamic>> getCustomerOrderTracking(
       int orderId) async {
     final res = await http.get(Uri.parse('$baseUrl/orders/$orderId'),
@@ -263,6 +271,14 @@ class ApiService {
   static Future<Map<String, dynamic>> getDriverOrders(int driverId) async {
     final res = await http.get(Uri.parse('$baseUrl/driver/$driverId/orders'),
         headers: _headers);
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<Map<String, dynamic>> getOrderDetails(int orderId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/orders/$orderId'),
+      headers: _headers,
+    );
     return Map<String, dynamic>.from(_decode(res));
   }
 
@@ -286,7 +302,6 @@ class ApiService {
   }
 
   // ============ المحفظة والإحصائيات ============
-
   static Future<Map<String, dynamic>> getDriverWallet(int driverId) async {
     final res = await http.get(Uri.parse('$baseUrl/driver/$driverId/wallet'),
         headers: _headers);
@@ -298,9 +313,292 @@ class ApiService {
         headers: _headers);
     return Map<String, dynamic>.from(_decode(res));
   }
+
+  // ============ المتاجر القريبة ============
+  static Future<List<Map<String, dynamic>>> getNearbyStores({
+    required double lat,
+    required double lng,
+    double radius = 5.0,
+  }) async {
+    final uri = Uri.parse('$baseUrl/stores/nearby').replace(queryParameters: {
+      'lat': lat.toString(),
+      'lng': lng.toString(),
+      'radius': radius.toString(),
+    });
+    final res = await http.get(uri, headers: _headers);
+    final decoded = _decode(res);
+    return List<Map<String, dynamic>>.from(decoded);
+  }
+
+  // ============ العروض القريبة ============
+  static Future<List<dynamic>> getNearbyOffers({
+    required double lat,
+    required double lng,
+    double radiusKm = 10,
+  }) async {
+    final uri = Uri.parse('$baseUrl/offers/nearby').replace(queryParameters: {
+      'lat': lat.toString(),
+      'lng': lng.toString(),
+      'radius': radiusKm.toString(),
+    });
+    final res = await http.get(uri, headers: _headers);
+    final decoded = _decode(res);
+    return List<dynamic>.from(decoded);
+  }
+
+  // ============ تحديث موقع السائق ============
+  static Future<void> updateDriverLocation({
+    required int orderId,
+    required int driverId,
+    required double lat,
+    required double lng,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/driver/location'),
+      headers: _headers,
+      body: jsonEncode({
+        'order_id': orderId,
+        'driver_id': driverId,
+        'lat': lat,
+        'lng': lng,
+      }),
+    );
+    _decode(res);
+  }
+
+  static Future<Map<String, dynamic>> getDriverLocation(int orderId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/driver/location/$orderId'),
+      headers: _headers,
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  // ============ دوال رفع الصور والكوبونات والإعدادات ============
+  static Future<Map<String, dynamic>> uploadImage(File image) async {
+    final uri = Uri.parse('$baseUrl/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Accept'] = 'application/json'
+      ..headers['Authorization'] = _token != null ? 'Bearer $_token' : ''
+      ..files.add(await http.MultipartFile.fromPath('image', image.path));
+    final response = await request.send();
+    final res = await http.Response.fromStream(response);
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<Map<String, dynamic>> applyCoupon(String code, double total) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/coupons/apply'),
+      headers: _headers,
+      body: jsonEncode({'code': code, 'total': total}),
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<Map<String, dynamic>> getSettings() async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/settings'),
+      headers: _headers,
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> data) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/settings'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  // ============ إدارة المخزون (جديد) ============
+  static Future<List<dynamic>> getInventory(int storeId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/merchant/$storeId/inventory'),
+      headers: _headers,
+    );
+    return List<dynamic>.from(_decode(res));
+  }
+
+  static Future<Map<String, dynamic>> addProductToInventory({
+    required int storeId,
+    required String name,
+    required int quantity,
+    required String unit,
+    required double price,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/merchant/inventory'),
+      headers: _headers,
+      body: jsonEncode({
+        'store_id': storeId,
+        'name': name,
+        'quantity': quantity,
+        'unit': unit,
+        'price': price,
+      }),
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<void> toggleProductActivation(int productId, bool isActive) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/merchant/inventory/$productId/toggle'),
+      headers: _headers,
+      body: jsonEncode({'is_active': isActive}),
+    );
+    _decode(res);
+  }
+
+  static Future<Map<String, dynamic>> checkProductAvailability(int productId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/merchant/inventory/$productId/availability'),
+      headers: _headers,
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  // دالة updateInventoryQuantity مع storeId اختياري
+  static Future<Map<String, dynamic>> updateInventoryQuantity({
+    required int productId,
+    required int quantity,
+    required String action,
+    int? storeId,
+  }) async {
+    final body = {
+      'quantity': quantity,
+      'action': action,
+    };
+    if (storeId != null) body['store_id'] = storeId;
+
+    final res = await http.put(
+      Uri.parse('$baseUrl/merchant/inventory/$productId/quantity'),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  // دالة updateInventory (تستدعي updateInventoryQuantity مع action='add')
+  static Future<Map<String, dynamic>> updateInventory({
+    required int productId,
+    required int quantityAdded,
+    int? storeId,
+  }) async {
+    return await updateInventoryQuantity(
+      productId: productId,
+      quantity: quantityAdded,
+      action: 'add',
+      storeId: storeId,
+    );
+  }
+
+  // دالة لخصم الكمية (تستدعي updateInventoryQuantity مع action='subtract')
+  static Future<Map<String, dynamic>> subtractInventory({
+    required int productId,
+    required int quantity,
+    int? storeId,
+  }) async {
+    return await updateInventoryQuantity(
+      productId: productId,
+      quantity: quantity,
+      action: 'subtract',
+      storeId: storeId,
+    );
+  }
+
+  // ============ إدارة الطلبات للتاجر ============
+  static Future<void> acceptOrderByMerchant(int orderId, int storeId) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/merchant/orders/$orderId/accept'),
+      headers: _headers,
+      body: jsonEncode({'store_id': storeId}),
+    );
+    _decode(res);
+  }
+
+  static Future<void> cancelOrder(int orderId, int storeId) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/merchant/orders/$orderId/cancel'),
+      headers: _headers,
+      body: jsonEncode({'store_id': storeId}),
+    );
+    _decode(res);
+  }
+
+  static Future<void> rejectOrder(int orderId, int storeId) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/merchant/orders/$orderId/reject'),
+      headers: _headers,
+      body: jsonEncode({'store_id': storeId}),
+    );
+    _decode(res);
+  }
+
+  // ============ دوال إضافية ============
+  static Future<Map<String, dynamic>> getUserProfile(int userId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/users/$userId'),
+      headers: _headers,
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<Map<String, dynamic>> getDriverInfo(int driverId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/drivers/$driverId'),
+      headers: _headers,
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<void> updateDriverLocationWithSpeed({
+    required int orderId,
+    required int driverId,
+    required double lat,
+    required double lng,
+    required double speed,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/driver/location'),
+      headers: _headers,
+      body: jsonEncode({
+        'order_id': orderId,
+        'driver_id': driverId,
+        'lat': lat,
+        'lng': lng,
+        'speed': speed,
+      }),
+    );
+    _decode(res);
+  }
+
+  static Future<Map<String, dynamic>> getOrderDetailsWithDriver(int orderId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/orders/$orderId/details'),
+      headers: _headers,
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
+
+  static Future<List<dynamic>> getInventoryHistory(int productId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/merchant/inventory/$productId/history'),
+      headers: _headers,
+    );
+    return List<dynamic>.from(_decode(res));
+  }
+
+  static Future<Map<String, dynamic>> getInventoryStats(int storeId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/merchant/$storeId/inventory/stats'),
+      headers: _headers,
+    );
+    return Map<String, dynamic>.from(_decode(res));
+  }
 }
 
-/// استثناء بسيط يحمل رسالة الخطأ ليُعرض للمستخدم.
 class ApiException implements Exception {
   final String message;
   final int statusCode;

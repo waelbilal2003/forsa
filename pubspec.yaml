@@ -1,18 +1,45 @@
-name: forsa
-description: "تطبيق فرصة - سوق عروض متعدد الأدوار (زبون/تاجر/سائق)"
+name: forsa_app
+description: "تطبيق فرصة - عروض ومنتجات"
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '^3.11.0'
+  flutter: '>=3.22.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.6
-  http: ^1.2.0
-  google_fonts: ^6.2.1
-  shared_preferences: ^2.2.3
+
+  # الحزم الأساسية
+  http: ^1.1.0
+  shared_preferences: ^2.2.0
+  google_fonts: ^6.1.0
+
+  # الخرائط (OpenStreetMap)
+  flutter_map: ^6.0.0
+  latlong2: ^0.9.0
+
+  # خرائط Google
+  google_maps_flutter: ^2.5.0
+  geolocator: ^10.0.0
+
+  # الصور والكاميرا
+  image_picker: ^1.0.4
+  permission_handler: ^11.0.1
+
+  # روابط واتصال
+  url_launcher: ^6.2.1
+  connectivity_plus: ^5.0.1
+
+  # أدوات مساعدة
+  provider: ^6.0.5
+  intl: 0.20.2
+  flutter_localizations:
+    sdk: flutter
+
+  # Firebase (للإشعارات)
+  ## flutter_local_notifications: ^15.1.0
 
 dev_dependencies:
   flutter_test:
@@ -21,3 +48,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true

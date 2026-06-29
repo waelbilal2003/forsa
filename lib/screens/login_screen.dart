@@ -11,7 +11,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  String _selectedRole = 'customer'; // 'customer', 'merchant', 'driver'
+  String _selectedRole = 'customer';
 
   bool _customerObscure = true;
   bool _merchantObscure = true;
@@ -19,13 +19,24 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _loading = false;
 
-  // متحكمات الحقول لكل دور
   final _customerEmail = TextEditingController();
   final _customerPass = TextEditingController();
   final _merchantEmail = TextEditingController();
   final _merchantPass = TextEditingController();
   final _driverEmail = TextEditingController();
   final _driverPass = TextEditingController();
+
+  // متغير لعرض عنوان API الحالي (للتصحيح)
+  String _currentBaseUrl = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // قراءة عنوان API الحالي من ApiService
+    _currentBaseUrl = ApiService.baseUrl;
+    // طباعة العنوان في وحدة التحكم لمساعدتك في التصحيح
+    print('🌐 Current API Base URL: $_currentBaseUrl');
+  }
 
   @override
   void dispose() {
@@ -38,7 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // منطق الدخول الموحّد لكل الأدوار
   Future<void> _doLogin({
     required String role,
     required String email,
@@ -55,13 +65,13 @@ class _LoginScreenState extends State<LoginScreen> {
           role: role, email: email.trim(), password: password);
       Session.setFromLogin(data);
       if (!mounted) return;
-      // pushReplacement: شاشة الدخول تُستبدل بواجهة الدور.
-      // زر الرجوع داخل واجهة الدور يعيد المستخدم لشاشة الدخول (وليس لواجهة أخرى).
       Navigator.pushReplacementNamed(context, targetRoute);
     } on ApiException catch (e) {
       _showMessage(e.message);
-    } catch (_) {
-      _showMessage('تعذّر الاتصال بالخادم. تحقق من الإنترنت وعنوان الـ API.');
+    } catch (e) {
+      // طباعة تفاصيل الخطأ الحقيقي (مثل SocketException أو Timeout)
+      print('❌ Login error details: $e');
+      _showMessage('تعذّر الاتصال بالخادم. تحقق من عنوان الـ API: $_currentBaseUrl\nالخطأ: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -70,6 +80,54 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showMessage(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  // نافذة لتغيير عنوان الـ API (للتصحيح فقط)
+  void _showChangeBaseUrlDialog() {
+    final controller = TextEditingController(text: ApiService.baseUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تغيير عنوان السيرفر'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('أدخل عنوان API الجديد (مثل http://192.168.10.234:8000/api)'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'http://192.168.10.234:8000/api',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newUrl = controller.text.trim();
+                if (newUrl.isNotEmpty) {
+                  await ApiService.setBaseUrl(newUrl);
+                  setState(() {
+                    _currentBaseUrl = ApiService.baseUrl;
+                  });
+                  _showMessage('تم تغيير عنوان السيرفر إلى:\n$_currentBaseUrl');
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -207,6 +265,13 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
+      floatingActionButton: Builder(
+        builder: (context) => FloatingActionButton.small(
+          onPressed: _showChangeBaseUrlDialog,
+          backgroundColor: Colors.white,
+          child: const Icon(Icons.settings, color: Colors.black87),
+        ),
+      ),
     );
   }
 
@@ -303,7 +368,7 @@ class _LoginScreenState extends State<LoginScreen> {
               role: 'customer',
               email: _customerEmail.text,
               password: _customerPass.text,
-              targetRoute: '/', // الواجهة الرئيسية للزبون
+              targetRoute: '/',
             )),
       ],
     );
@@ -348,7 +413,7 @@ class _LoginScreenState extends State<LoginScreen> {
               role: 'merchant',
               email: _merchantEmail.text,
               password: _merchantPass.text,
-              targetRoute: '/merchant-orders', // واجهة التاجر
+              targetRoute: '/merchant-orders',
             )),
       ],
     );
@@ -392,13 +457,12 @@ class _LoginScreenState extends State<LoginScreen> {
               role: 'driver',
               email: _driverEmail.text,
               password: _driverPass.text,
-              targetRoute: '/driver-home', // واجهة السائق
+              targetRoute: '/driver-home',
             )),
       ],
     );
   }
 
-  // زر الدخول الموحّد (يعرض مؤشّر تحميل أثناء الاتصال)
   Widget _loginButton(VoidCallback onPressed) {
     return SizedBox(
       width: double.infinity,

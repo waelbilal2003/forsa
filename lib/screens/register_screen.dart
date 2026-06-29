@@ -10,137 +10,61 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  String _selectedRole = 'customer';
-  String? _selectedVehicleType = 'سيارة';
   bool _loading = false;
 
-  // حقول مشتركة وخاصة بكل دور
+  // حقول الزبون فقط
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   final _city = TextEditingController();
-  final _license = TextEditingController();
-  final _storeName = TextEditingController();
-  final _storeDesc = TextEditingController();
 
   @override
   void dispose() {
-    for (final c in [
-      _name,
-      _email,
-      _phone,
-      _password,
-      _confirm,
-      _city,
-      _license,
-      _storeName,
-      _storeDesc
-    ]) {
-      c.dispose();
-    }
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _password.dispose();
+    _confirm.dispose();
+    _city.dispose();
     super.dispose();
   }
 
   void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(m), behavior: SnackBarBehavior.floating));
 
-  // نافذة منبثقة لإدخال عنوان API وحفظه (يُستخدم في كل النداءات بعد الحفظ).
-  Future<void> _openApiSettings() async {
-    final ctrl = TextEditingController(text: ApiService.baseUrl);
-    final saved = await showDialog<String>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إعدادات الخادم (API)'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                  'أدخل عنوان الـ API الذي سيتصل به التطبيق. سيُحفظ ويُستخدم في كل العمليات.'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ctrl,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'عنوان API',
-                  hintText: 'http://localhost:8000/api',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-              child: const Text('حفظ'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (saved == null) return;
-    await ApiService.setBaseUrl(saved);
-    if (!mounted) return;
-    _snack('تم حفظ عنوان الخادم');
-  }
-
-  // تحقق مشترك من الحقول الأساسية
-  String? _validateCommon() {
-    if (_name.text.trim().isEmpty) return 'الرجاء إدخال الاسم';
-    if (!_email.text.contains('@')) return 'بريد إلكتروني غير صحيح';
-    if (_phone.text.trim().length < 6) return 'رقم هاتف غير صحيح';
-    if (_password.text.length < 6) return 'كلمة المرور 6 أحرف على الأقل';
-    if (_password.text != _confirm.text) return 'كلمتا المرور غير متطابقتين';
-    return null;
-  }
-
   Future<void> _submit() async {
-    final err = _validateCommon();
-    if (err != null) {
-      _snack(err);
+    if (_name.text.trim().isEmpty) {
+      _snack('الرجاء إدخال الاسم');
       return;
     }
-    if (_selectedRole == 'merchant' && _storeName.text.trim().isEmpty) {
-      _snack('الرجاء إدخال اسم المتجر');
+    if (!_email.text.contains('@')) {
+      _snack('بريد إلكتروني غير صحيح');
+      return;
+    }
+    if (_phone.text.trim().length < 6) {
+      _snack('رقم هاتف غير صحيح');
+      return;
+    }
+    if (_password.text.length < 6) {
+      _snack('كلمة المرور 6 أحرف على الأقل');
+      return;
+    }
+    if (_password.text != _confirm.text) {
+      _snack('كلمتا المرور غير متطابقتين');
       return;
     }
 
     setState(() => _loading = true);
     try {
-      if (_selectedRole == 'customer') {
-        await ApiService.registerCustomer({
-          'name': _name.text.trim(),
-          'email': _email.text.trim(),
-          'phone': _phone.text.trim(),
-          'city': _city.text.trim(),
-          'password': _password.text,
-        });
-      } else if (_selectedRole == 'driver') {
-        await ApiService.registerDriver({
-          'name': _name.text.trim(),
-          'email': _email.text.trim(),
-          'phone': _phone.text.trim(),
-          'vehicle_type': _selectedVehicleType,
-          'license_number': _license.text.trim(),
-          'password': _password.text,
-        });
-      } else {
-        await ApiService.registerMerchant({
-          'name': _name.text.trim(),
-          'email': _email.text.trim(),
-          'phone': _phone.text.trim(),
-          'store_name': _storeName.text.trim(),
-          'description': _storeDesc.text.trim(),
-          'password': _password.text,
-        });
-      }
+      await ApiService.registerCustomer({
+        'name': _name.text.trim(),
+        'email': _email.text.trim(),
+        'phone': _phone.text.trim(),
+        'city': _city.text.trim(),
+        'password': _password.text,
+      });
       if (!mounted) return;
       _snack('تم إنشاء الحساب بنجاح، سجّل دخولك الآن');
       Navigator.pop(context); // العودة لشاشة الدخول
@@ -162,15 +86,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           icon: const Icon(Icons.arrow_forward),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('أهلاً بك في فرصة'),
+        title: const Text('إنشاء حساب جديد - زبون'),
         backgroundColor: Colors.white.withOpacity(0.8),
-        actions: [
-          IconButton(
-            tooltip: 'إعدادات الخادم',
-            icon: const Icon(Icons.settings),
-            onPressed: _openApiSettings,
-          ),
-        ],
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
@@ -179,39 +96,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildRoleButton('زبون', Icons.person, 'customer'),
-                  _buildRoleButton('سائق', Icons.local_shipping, 'driver'),
-                  _buildRoleButton('تاجر', Icons.store, 'merchant'),
-                ],
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  'مرحباً بك في فرصة',
+                  style: GoogleFonts.tajawal(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF2B2F33),
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  'أنشئ حساب زبون للاستفادة من العروض',
+                  style: const TextStyle(color: Color(0xFF585C61)),
+                ),
+              ),
+              const SizedBox(height: 32),
               _commonField('الاسم الكامل', _name, Icons.person_outline,
                   hint: 'أدخل اسمك الثلاثي'),
               _commonField('البريد الإلكتروني', _email, Icons.email_outlined,
-                  hint: 'example@mail.com',
-                  keyboard: TextInputType.emailAddress),
+                  hint: 'example@mail.com', keyboard: TextInputType.emailAddress),
               _commonField('رقم الهاتف', _phone, Icons.phone_outlined,
                   hint: '09xxxxxxxx', keyboard: TextInputType.phone),
-              if (_selectedRole == 'customer')
-                _commonField(
-                    'المدينة / المنطقة', _city, Icons.location_on_outlined,
-                    hint: 'اكتب عنوانك أو منطقتك'),
-              if (_selectedRole == 'driver') ...[
-                _buildVehicleDropdown(),
-                _commonField('رقم الرخصة', _license, Icons.badge_outlined,
-                    hint: 'رقم رخصة القيادة'),
-              ],
-              if (_selectedRole == 'merchant') ...[
-                _commonField(
-                    'اسم المتجر', _storeName, Icons.storefront_outlined,
-                    hint: 'مثلاً: متجر البركة للأقمشة'),
-                _commonField(
-                    'وصف المتجر', _storeDesc, Icons.description_outlined,
-                    hint: 'أخبر عملاءك عن تميز متجرك...'),
-              ],
+              _commonField('المدينة / المنطقة', _city, Icons.location_on_outlined,
+                  hint: 'اكتب عنوانك أو منطقتك'),
               _commonField('كلمة المرور', _password, Icons.lock_outline,
                   obscure: true),
               _commonField('تأكيد كلمة المرور', _confirm, Icons.lock_outline,
@@ -269,43 +180,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildRoleButton(String label, IconData icon, String role) {
-    final isSelected = _selectedRole == role;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedRole = role),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFFF7A2C) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2)),
-            ],
-          ),
-          child: Column(
-            children: [
-              Icon(icon,
-                  color: isSelected ? Colors.white : const Color(0xFFFF7A2C),
-                  size: 28),
-              const SizedBox(height: 6),
-              Text(label,
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: isSelected ? Colors.white : Colors.black87)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _commonField(String label, TextEditingController c, IconData icon,
       {String? hint, bool obscure = false, TextInputType? keyboard}) {
     return Padding(
@@ -329,37 +203,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderSide: BorderSide.none,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVehicleDropdown() {
-    const types = ['سيارة', 'دراجة نارية', 'دراجة هوائية', 'شاحنة صغيرة'];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('نوع المركبة',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _selectedVehicleType,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.directions_car_outlined),
-              filled: true,
-              fillColor: const Color(0xFFEDF1F7),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            items: types
-                .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                .toList(),
-            onChanged: (v) => setState(() => _selectedVehicleType = v),
           ),
         ],
       ),

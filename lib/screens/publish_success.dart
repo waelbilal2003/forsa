@@ -1,5 +1,4 @@
-// lib/screens/publish_success.dart
-// شاشة تأكيد نشر العرض — تعود للتاجر بعد إضافة عرض جديد.
+
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';

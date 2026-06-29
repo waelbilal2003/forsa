@@ -1,5 +1,5 @@
-// lib/screens/chat_screen.dart
-// شاشة محادثة بسيطة (واجهة فقط) بين السائق والزبون.
+
+
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 

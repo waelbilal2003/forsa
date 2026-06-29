@@ -1,12 +1,8 @@
-// lib/screens/orders_screen.dart
-//
-// طلبات الزبون — تُحمّل طلباته الفعلية من الـ API مع حالاتها.
-// الضغط على طلب يفتح شاشة تتبّعه.
-
 import 'package:flutter/material.dart';
 import '../widgets/custom_bottom_nav.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import 'live_order_tracking_screen.dart'; // ✅ إضافة الاستيراد
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -89,9 +85,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget _buildOrderCard(dynamic order) {
     final status = order['status']?.toString() ?? 'pending';
     final total = order['total_price']?.toString() ?? '0';
+    final orderId = order['id'];
+
     return InkWell(
-      onTap: () => Navigator.pushNamed(context, '/track-order',
-          arguments: order['id']),
+      onTap: () {
+        // ✅ إذا كان الطلب في الطريق، نفتح شاشة التتبع الحي
+        if (status == 'shipped') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LiveOrderTrackingScreen(orderId: orderId),
+            ),
+          );
+        } else {
+          // وإلا نفتح شاشة التتبع العادية
+          Navigator.pushNamed(context, '/track-order', arguments: orderId);
+        }
+      },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -110,7 +120,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('طلب رقم #${order['id']}',
+                  Text('طلب رقم #$orderId',
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('$total ل.س',
@@ -119,17 +129,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: (_statusColor[status] ?? Colors.grey).withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(_statusAr[status] ?? status,
-                  style: TextStyle(
-                      color: _statusColor[status] ?? Colors.grey,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12)),
+              child: Text(
+                _statusAr[status] ?? status,
+                style: TextStyle(
+                  color: _statusColor[status] ?? Colors.grey,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ],
         ),

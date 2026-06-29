@@ -1,7 +1,3 @@
-// lib/screens/profile_screen.dart
-//
-// حساب الزبون — يعرض بيانات الجلسة، يربط بصفحة الطلبات، وزر الخروج يمسح
-// الجلسة ويعيد لشاشة الدخول. صُحّح فهرس الشريط السفلي إلى 3 (كان 4 خطأً).
 
 import 'package:flutter/material.dart';
 import '../widgets/custom_bottom_nav.dart';

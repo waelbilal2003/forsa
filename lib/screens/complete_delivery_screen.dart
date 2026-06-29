@@ -1,5 +1,4 @@
-// lib/screens/complete_delivery_screen.dart
-// إتمام التوصيل — يؤكّد السائق تسليم الطلب فيُحدّث في الـ API وتُضاف عمولته.
+
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';

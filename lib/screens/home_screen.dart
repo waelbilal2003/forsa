@@ -1,13 +1,10 @@
-// lib/screens/home_screen.dart
-//
-// نفس تصميم الشاشة الرئيسية — لكن العروض الآن تُحمَّل فعلياً من الـ API
-// بدل البيانات الثابتة. الضغط على عرض يفتح تفاصيله، وزر + يضيفه للسلة.
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_bottom_nav.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import 'nearby_offers_screen.dart';
+import '../utils/debouncer.dart'; // ✅ استيراد
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,10 +18,18 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _error;
 
+  final Debouncer _debouncer = Debouncer(milliseconds: 500);
+
   @override
   void initState() {
     super.initState();
     _loadOffers();
+  }
+
+  @override
+  void dispose() {
+    _debouncer.dispose();
+    super.dispose();
   }
 
   Future<void> _loadOffers({String? q}) async {
@@ -69,6 +74,10 @@ class _HomeScreenState extends State<HomeScreen> {
           title: const Text('فرصة'),
           actions: [
             IconButton(
+              onPressed: () => Navigator.pushNamed(context, '/settings'),
+              icon: const Icon(Icons.settings),
+            ),
+            IconButton(
                 onPressed: () {}, icon: const Icon(Icons.notifications_none)),
           ],
           leading: const CircleAvatar(
@@ -77,16 +86,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         body: RefreshIndicator(
-          onRefresh: _loadOffers,
+          onRefresh: () => _loadOffers(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ✅ حقل البحث مع Debouncer
                 TextField(
-                  onSubmitted: (v) =>
-                      _loadOffers(q: v.trim().isEmpty ? null : v),
+                  onChanged: (value) => _debouncer.run(
+                    () => _loadOffers(q: value.trim().isEmpty ? null : value),
+                  ),
                   decoration: InputDecoration(
                     hintText: 'ابحث عن منتج، مطعم، أو متجر...',
                     prefixIcon: const Icon(Icons.search),
@@ -97,43 +108,55 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        colors: [Color(0xFFFF7A2C), Color(0xFF9B3F00)]),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('اكتشف العروض القريبة',
-                                style: GoogleFonts.tajawal(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white)),
-                            const SizedBox(height: 4),
-                            const Text('خصومات تصل إلى 60%',
-                                style: TextStyle(
-                                    color: Colors.white70, fontSize: 14)),
-                          ],
+                // زر العروض القريبة
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const NearbyOffersScreen()),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                          colors: [Color(0xFFFF7A2C), Color(0xFF9B3F00)]),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('اكتشف العروض القريبة',
+                                  style: GoogleFonts.tajawal(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white)),
+                              const SizedBox(height: 4),
+                              const Text('خصومات تصل إلى 60%',
+                                  style: TextStyle(
+                                      color: Colors.white70, fontSize: 14)),
+                            ],
+                          ),
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(40)),
-                        child: const Icon(Icons.near_me, color: Colors.white),
-                      ),
-                    ],
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(40)),
+                          child:
+                              const Icon(Icons.near_me, color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
+                // قسم العروض الخاطفة
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -195,7 +218,6 @@ class _HomeScreenState extends State<HomeScreen> {
           final productId = int.tryParse(o['product_id'].toString()) ?? 0;
           final image = o['image_url']?.toString();
 
-          // مدة العرض المتبقية وحالة الكمية
           final endDate = DateTime.tryParse(o['end_date']?.toString() ?? '');
           final stock = int.tryParse(o['stock']?.toString() ?? '');
           final expired = endDate != null && endDate.isBefore(DateTime.now());
@@ -267,7 +289,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          // مدة العرض / حالة الانتهاء أو نفاذ الكمية
                           Row(
                             children: [
                               Icon(
@@ -312,7 +333,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // نص مدة العرض المتبقية بالأيام/الساعات.
   String _durationLabel(DateTime? endDate, bool expired) {
     if (endDate == null) return 'مدة العرض غير محددة';
     if (expired) return 'انتهى العرض';

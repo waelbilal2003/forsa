@@ -1,5 +1,4 @@
-// lib/screens/order_tracking_screen.dart
-// تتبّع التوصيل من جهة السائق — عرض حالة الطلب الحالي.
+
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';

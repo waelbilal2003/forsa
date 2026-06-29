@@ -1,8 +1,3 @@
-// lib/screens/add_offer.dart
-//
-// إضافة عرض جديد (للتاجر) — مربوطة بالـ API. تنشئ المنتج والعرض معاً،
-// وتحسب نسبة الخصم تلقائياً من السعرين. بعد النجاح تنتقل لشاشة النجاح.
-
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';
@@ -25,6 +20,11 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   bool _loading = false;
+
+  String _selectedUnit = 'قطعة';
+  final List<String> _units = [
+    'قطعة', 'كيلو', 'غرام', 'لتر', 'مل', 'متر', 'سم', 'علبة', 'صندوق', 'طرد'
+  ];
 
   @override
   void dispose() {
@@ -78,6 +78,7 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
         'image_url': _imageUrl.text.trim(),
         'start_date': _startDate!.toIso8601String(),
         'end_date': _endDate!.toIso8601String(),
+        'unit': _selectedUnit,
       });
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/publish_success');
@@ -111,6 +112,9 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
             children: [
               _field('اسم المنتج', _productName,
                   hint: 'مثال: وجبة التوفير العائلية'),
+              const SizedBox(height: 16),
+              _buildUnitDropdown(),
+              const SizedBox(height: 16),
               _field('وصف العرض', _description,
                   hint: 'اكتب تفاصيل تجذب العملاء...', lines: 3),
               Row(
@@ -171,6 +175,35 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildUnitDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('وحدة القياس', style: AppTypography.labelLarge),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedUnit,
+              isExpanded: true,
+              items: _units.map((unit) {
+                return DropdownMenuItem(value: unit, child: Text(unit));
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => _selectedUnit = value);
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
