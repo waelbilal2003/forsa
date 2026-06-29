@@ -28,9 +28,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JvmTarget.JVM_11
+    kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
     }
+}
 
     defaultConfig {
         applicationId = "sy.forsa.syrian_arab"
